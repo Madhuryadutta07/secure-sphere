@@ -131,9 +131,9 @@ const Index = () => {
         <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-primary" />
-            <span className="text-sm font-semibold">SecureBank</span>
+            <span className="text-sm font-semibold">Mini Banking</span>
           </div>
-          <p className="text-xs text-muted-foreground">© 2026 SecureBank. Mini Banking & Fraud Detection System — DBMS Project.</p>
+          <p className="text-xs text-muted-foreground">© 2026 Mini Banking & Fraud Detection System — DBMS Project.</p>
         </div>
       </footer>
     </div>
