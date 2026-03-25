@@ -50,7 +50,7 @@ const Index = () => {
               <span className="text-xs font-medium text-primary">Real-time Fraud Monitoring</span>
             </div>
             <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-6 animate-fade-in" style={{ animationDelay: "0.1s" }}>
-              Secure Banking &{" "}
+              Mini Banking &{" "}
               <span className="text-gradient-primary">Fraud Detection</span>{" "}
               System
             </h1>
