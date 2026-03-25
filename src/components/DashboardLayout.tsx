@@ -40,7 +40,7 @@ const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
       `}>
         <div className="flex items-center gap-2 h-16 px-4 border-b border-sidebar-border shrink-0">
           <Shield className="h-7 w-7 text-primary shrink-0" />
-          {sidebarOpen && <span className="text-base font-bold text-foreground">SecureBank</span>}
+          {sidebarOpen && <span className="text-base font-bold text-foreground">Mini Banking</span>}
           <button onClick={() => setSidebarOpen(!sidebarOpen)} className="ml-auto hidden lg:block text-muted-foreground hover:text-foreground">
             <ChevronLeft className={`h-4 w-4 transition-transform ${!sidebarOpen ? "rotate-180" : ""}`} />
           </button>
