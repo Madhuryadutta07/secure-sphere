@@ -1,4 +1,5 @@
-const base = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+const rawBase = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+const base = rawBase.replace(/\/+$/, "");
 
 async function parseJson<T>(input: Response | Promise<Response>): Promise<T> {
   const r = await input;

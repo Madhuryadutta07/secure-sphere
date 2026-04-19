@@ -8,13 +8,36 @@ initDb();
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 
+const defaultOrigins = [
+  "http://localhost:8080",
+  "http://127.0.0.1:8080",
+  "http://[::1]:8080",
+];
+const extraOrigins = (process.env.FRONTEND_ORIGIN || "")
+  .split(",")
+  .map((s) => s.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+const allowedOrigins = new Set([...defaultOrigins, ...extraOrigins]);
+const vercelOrigin = /^https:\/\/[a-z0-9-]+\.vercel\.app$/i;
+const allowAllVercel =
+  process.env.ALLOW_VERCEL_ORIGINS === "1" || process.env.ALLOW_VERCEL_ORIGINS === "true";
+
 app.use(
   cors({
-    origin: ["http://localhost:8080", "http://127.0.0.1:8080", "http://[::1]:8080"],
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.has(origin)) return callback(null, true);
+      if (allowAllVercel && vercelOrigin.test(origin)) return callback(null, true);
+      return callback(null, false);
+    },
     credentials: true,
   })
 );
 app.use(express.json());
+
+app.get("/", (_req, res) => {
+  res.json({ ok: true, service: "secure-bank-api", hint: "API routes are under /api/..." });
+});
 
 const mapAccount = (row) => ({
   id: row.id,

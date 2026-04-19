@@ -1,0 +1,15 @@
+# Render Blueprint: deploy the API from /server
+# After deploy, set FRONTEND_ORIGIN in the Render dashboard to your Vercel URL, e.g. https://your-app.vercel.app
+# In Vercel, set VITE_API_BASE to your Render service URL, e.g. https://your-api.onrender.com
+
+services:
+  - type: web
+    name: secure-bank-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
