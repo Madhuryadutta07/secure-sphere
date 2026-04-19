@@ -1,16 +1,52 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DashboardLayout from "@/components/DashboardLayout";
 import { api } from "@/lib/api";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Plus } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Cards = () => {
+  const [showForm, setShowForm] = useState(false);
+  const [customerId, setCustomerId] = useState("");
+  const [cardType, setCardType] = useState("");
+  const [cardLimit, setCardLimit] = useState("");
+  const queryClient = useQueryClient();
   const { data: cards = [] } = useQuery({ queryKey: ["cards"], queryFn: api.getCards });
+  const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: api.getCustomers });
+  const addCard = useMutation({
+    mutationFn: () =>
+      api.addCard({
+        customerId: customerId.trim().toUpperCase(),
+        type: cardType,
+        limit: Number(cardLimit || 0),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["cards"] });
+      setShowForm(false);
+      setCustomerId("");
+      setCardType("");
+      setCardLimit("");
+      toast.success("Card issued");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold mb-1">Cards</h1>
-          <p className="text-sm text-muted-foreground">Manage debit and credit cards</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold mb-1">Cards</h1>
+            <p className="text-sm text-muted-foreground">Manage debit and credit cards</p>
+          </div>
+          <Button onClick={() => setShowForm(true)} className="bg-gradient-primary text-primary-foreground">
+            <Plus className="h-4 w-4 mr-2" /> Issue Card
+          </Button>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-5">
@@ -39,6 +75,65 @@ const Cards = () => {
             </div>
           ))}
         </div>
+
+        <Dialog open={showForm} onOpenChange={setShowForm}>
+          <DialogContent className="glass-card border-border/30">
+            <DialogHeader>
+              <DialogTitle>Issue New Card</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Customer ID</Label>
+                <Select value={customerId} onValueChange={setCustomerId}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50">
+                    <SelectValue placeholder="Select customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.id} - {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Choose a valid customer to avoid lookup errors.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Card Type</Label>
+                <Select value={cardType} onValueChange={setCardType}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50">
+                    <SelectValue placeholder="Select card type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Visa Debit">Visa Debit</SelectItem>
+                    <SelectItem value="Mastercard Credit">Mastercard Credit</SelectItem>
+                    <SelectItem value="Visa Credit">Visa Credit</SelectItem>
+                    <SelectItem value="Rupay Debit">Rupay Debit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Card Limit</Label>
+                <Input
+                  className="bg-secondary/50 border-border/50"
+                  placeholder="₹100000"
+                  type="number"
+                  value={cardLimit}
+                  onChange={(e) => setCardLimit(e.target.value)}
+                />
+              </div>
+              <Button
+                className="w-full bg-gradient-primary text-primary-foreground"
+                disabled={addCard.isPending}
+                onClick={() => addCard.mutate()}
+              >
+                {addCard.isPending ? "Issuing…" : "Issue Card"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

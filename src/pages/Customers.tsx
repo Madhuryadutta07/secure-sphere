@@ -11,9 +11,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 
 const Customers = () => {
   const [showForm, setShowForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [selectedId, setSelectedId] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [status, setStatus] = useState<"Active" | "Inactive">("Active");
   const queryClient = useQueryClient();
   const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: api.getCustomers });
   const addCustomer = useMutation({
@@ -25,10 +28,44 @@ const Customers = () => {
       setName("");
       setEmail("");
       setPhone("");
+      setStatus("Active");
       toast.success("Customer added");
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const updateCustomer = useMutation({
+    mutationFn: () => api.updateCustomer(selectedId, { name, email, phone, status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["summary"] });
+      setShowEditForm(false);
+      setSelectedId("");
+      setName("");
+      setEmail("");
+      setPhone("");
+      setStatus("Active");
+      toast.success("Customer updated");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteCustomer = useMutation({
+    mutationFn: (id: string) => api.deleteCustomer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["summary"] });
+      toast.success("Customer deleted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const openEdit = (customer: (typeof customers)[number]) => {
+    setSelectedId(customer.id);
+    setName(customer.name);
+    setEmail(customer.email);
+    setPhone(customer.phone ?? "");
+    setStatus(customer.status === "Inactive" ? "Inactive" : "Active");
+    setShowEditForm(true);
+  };
 
   return (
     <DashboardLayout>
@@ -76,10 +113,21 @@ const Customers = () => {
                     <td className="py-3 px-4">{c.accounts}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-primary"
+                          onClick={() => openEdit(c)}
+                        >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          disabled={deleteCustomer.isPending}
+                          onClick={() => deleteCustomer.mutate(c.id)}
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -132,6 +180,73 @@ const Customers = () => {
                 onClick={() => addCustomer.mutate()}
               >
                 {addCustomer.isPending ? "Saving…" : "Save Customer"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
+          <DialogContent className="glass-card border-border/30">
+            <DialogHeader>
+              <DialogTitle>Edit Customer</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Full Name</Label>
+                <Input
+                  className="bg-secondary/50 border-border/50"
+                  placeholder="Enter name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Email</Label>
+                <Input
+                  className="bg-secondary/50 border-border/50"
+                  placeholder="Enter email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Phone</Label>
+                <Input
+                  className="bg-secondary/50 border-border/50"
+                  placeholder="Enter phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Status</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={status === "Active" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setStatus("Active")}
+                  >
+                    Active
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={status === "Inactive" ? "default" : "outline"}
+                    className="flex-1"
+                    onClick={() => setStatus("Inactive")}
+                  >
+                    Inactive
+                  </Button>
+                </div>
+              </div>
+              <Button
+                type="button"
+                className="w-full bg-gradient-primary text-primary-foreground"
+                disabled={updateCustomer.isPending}
+                onClick={() => updateCustomer.mutate()}
+              >
+                {updateCustomer.isPending ? "Saving…" : "Save Changes"}
               </Button>
             </div>
           </DialogContent>

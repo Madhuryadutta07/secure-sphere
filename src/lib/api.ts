@@ -32,6 +32,26 @@ export function postJson<T, B = unknown>(path: string, body: B) {
   );
 }
 
+export function putJson<T, B = unknown>(path: string, body: B) {
+  return parseJson<T>(
+    fetch(`${base}${path}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(body),
+    })
+  );
+}
+
+export function deleteJson<T>(path: string) {
+  return parseJson<T>(
+    fetch(`${base}${path}`, {
+      method: "DELETE",
+      credentials: "include",
+    })
+  );
+}
+
 export type Customer = {
   id: string;
   name: string;
@@ -39,6 +59,13 @@ export type Customer = {
   phone: string;
   status: string;
   accounts: number;
+};
+
+export type UpsertCustomerInput = {
+  name: string;
+  email: string;
+  phone: string;
+  status?: string;
 };
 
 export type BankAccount = {
@@ -67,6 +94,20 @@ export type Card = {
   type: string;
   status: string;
   limit: number;
+};
+
+export type CreateAccountInput = {
+  customerId: string;
+  type: string;
+  balance: number;
+  status?: string;
+};
+
+export type CreateCardInput = {
+  customerId: string;
+  type: string;
+  limit: number;
+  status?: string;
 };
 
 export type FraudDetection = {
@@ -111,11 +152,15 @@ export type DashboardSummary = {
 export const api = {
   getSummary: () => getJson<DashboardSummary>("/api/dashboard/summary"),
   getCustomers: () => getJson<Customer[]>("/api/customers"),
-  addCustomer: (b: { name: string; email: string; phone: string; status?: string }) =>
-    postJson<Customer>("/api/customers", b),
+  addCustomer: (b: UpsertCustomerInput) => postJson<Customer, UpsertCustomerInput>("/api/customers", b),
+  updateCustomer: (id: string, b: UpsertCustomerInput) =>
+    putJson<Customer, UpsertCustomerInput>(`/api/customers/${id}`, b),
+  deleteCustomer: (id: string) => deleteJson<{ ok: boolean }>(`/api/customers/${id}`),
   getAccounts: () => getJson<BankAccount[]>("/api/accounts"),
+  addAccount: (b: CreateAccountInput) => postJson<BankAccount, CreateAccountInput>("/api/accounts", b),
   getTransactions: () => getJson<BankTransaction[]>("/api/transactions"),
   getCards: () => getJson<Card[]>("/api/cards"),
+  addCard: (b: CreateCardInput) => postJson<Card, CreateCardInput>("/api/cards", b),
   getFraudDetections: () => getJson<FraudDetection[]>("/api/fraud-detections"),
   getFraudAlerts: () => getJson<FraudAlert[]>("/api/fraud-alerts"),
   getTransactionTrends: () => getJson<TransactionTrend[]>("/api/reports/transaction-trends"),

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DashboardLayout from "@/components/DashboardLayout";
 import { api } from "@/lib/api";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 const Accounts = () => {
   const [showForm, setShowForm] = useState(false);
+  const [customerId, setCustomerId] = useState("");
+  const [accountType, setAccountType] = useState("");
+  const [initialDeposit, setInitialDeposit] = useState("");
+  const queryClient = useQueryClient();
   const { data: accounts = [] } = useQuery({ queryKey: ["accounts"], queryFn: api.getAccounts });
+  const { data: customers = [] } = useQuery({ queryKey: ["customers"], queryFn: api.getCustomers });
+  const createAccount = useMutation({
+    mutationFn: () =>
+      api.addAccount({
+        customerId: customerId.trim().toUpperCase(),
+        type: accountType,
+        balance: Number(initialDeposit || 0),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["summary"] });
+      setShowForm(false);
+      setCustomerId("");
+      setAccountType("");
+      setInitialDeposit("");
+      toast.success("Account created");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   return (
     <DashboardLayout>
@@ -53,25 +77,48 @@ const Accounts = () => {
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Customer ID</Label>
-                <Input className="bg-secondary/50 border-border/50" placeholder="e.g. C001" />
+                <Select value={customerId} onValueChange={setCustomerId}>
+                  <SelectTrigger className="bg-secondary/50 border-border/50">
+                    <SelectValue placeholder="Select customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.id} - {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Account Type</Label>
-                <Select>
+                <Select value={accountType} onValueChange={setAccountType}>
                   <SelectTrigger className="bg-secondary/50 border-border/50">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="savings">Savings</SelectItem>
-                    <SelectItem value="current">Current</SelectItem>
+                    <SelectItem value="Savings">Savings</SelectItem>
+                    <SelectItem value="Current">Current</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Initial Deposit</Label>
-                <Input className="bg-secondary/50 border-border/50" placeholder="₹0.00" type="number" />
+                <Input
+                  className="bg-secondary/50 border-border/50"
+                  placeholder="₹0.00"
+                  type="number"
+                  value={initialDeposit}
+                  onChange={(e) => setInitialDeposit(e.target.value)}
+                />
               </div>
-              <Button className="w-full bg-gradient-primary text-primary-foreground">Create Account</Button>
+              <Button
+                className="w-full bg-gradient-primary text-primary-foreground"
+                disabled={createAccount.isPending}
+                onClick={() => createAccount.mutate()}
+              >
+                {createAccount.isPending ? "Creating…" : "Create Account"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

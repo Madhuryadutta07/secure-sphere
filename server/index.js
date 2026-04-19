@@ -85,6 +85,23 @@ const mapCard = (row) => ({
   limit: row.card_limit,
 });
 
+function nextPrefixedId(prefix, table) {
+  const ids = db
+    .prepare(`SELECT id FROM ${table} WHERE id GLOB ?`)
+    .all(`${prefix}*`)
+    .map((r) => {
+      const n = parseInt(String(r.id).replace(new RegExp(`^${prefix}`, "i"), ""), 10);
+      return Number.isNaN(n) ? 0 : n;
+    });
+  const next = (ids.length ? Math.max(...ids) : 0) + 1;
+  return `${prefix}${String(next).padStart(3, "0")}`;
+}
+
+function randomMaskedCardNumber() {
+  const last4 = String(Math.floor(1000 + Math.random() * 9000));
+  return `•••• •••• •••• ${last4}`;
+}
+
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true, service: "secure-bank-api" });
 });
@@ -175,9 +192,92 @@ app.post("/api/customers", (req, res) => {
   });
 });
 
+app.put("/api/customers/:id", (req, res) => {
+  const id = req.params.id;
+  const existing = db.prepare("SELECT id FROM customers WHERE id = ?").get(id);
+  if (!existing) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+  const { name, email, phone, status = "Active" } = req.body;
+  if (!name || !email) {
+    return res.status(400).json({ error: "name and email are required" });
+  }
+  try {
+    db.prepare("UPDATE customers SET name = ?, email = ?, phone = ?, status = ? WHERE id = ?").run(
+      name,
+      email,
+      phone || "",
+      status,
+      id
+    );
+  } catch (e) {
+    if (e.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      return res.status(409).json({ error: "Email already registered" });
+    }
+    throw e;
+  }
+  const row = db
+    .prepare(
+      `SELECT c.id, c.name, c.email, c.phone, c.status,
+        (SELECT COUNT(*) FROM accounts a WHERE a.customer_id = c.id) as accounts
+     FROM customers c WHERE c.id = ?`
+    )
+    .get(id);
+  res.json({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    status: row.status,
+    accounts: row.accounts,
+  });
+});
+
+app.delete("/api/customers/:id", (req, res) => {
+  const id = req.params.id;
+  const accountCount = db
+    .prepare("SELECT COUNT(*) as c FROM accounts WHERE customer_id = ?")
+    .get(id).c;
+  if (accountCount > 0) {
+    return res.status(400).json({ error: "Cannot delete customer with existing accounts" });
+  }
+  const result = db.prepare("DELETE FROM customers WHERE id = ?").run(id);
+  if (result.changes === 0) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+  res.json({ ok: true });
+});
+
 app.get("/api/accounts", (_req, res) => {
   const rows = db.prepare("SELECT * FROM accounts ORDER BY id").all();
   res.json(rows.map(mapAccount));
+});
+
+app.post("/api/accounts", (req, res) => {
+  const { customerId, type, balance, status = "Active" } = req.body;
+  if (!customerId || !type || balance === undefined || balance === null) {
+    return res.status(400).json({ error: "customerId, type and balance are required" });
+  }
+
+  const normalizedCustomerId = String(customerId).trim().toUpperCase();
+  const customer = db.prepare("SELECT id FROM customers WHERE id = ?").get(normalizedCustomerId);
+  if (!customer) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+
+  const id = nextPrefixedId("ACC", "accounts");
+  const created = new Date().toISOString().slice(0, 10);
+  const numericBalance = Number(balance);
+  if (Number.isNaN(numericBalance) || numericBalance < 0) {
+    return res.status(400).json({ error: "balance must be a valid non-negative number" });
+  }
+
+  db.prepare(
+    "INSERT INTO accounts (id, customer_id, type, balance, status, created) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(id, normalizedCustomerId, type, numericBalance, status, created);
+
+  const row = db.prepare("SELECT * FROM accounts WHERE id = ?").get(id);
+  res.status(201).json(mapAccount(row));
 });
 
 app.get("/api/transactions", (_req, res) => {
@@ -188,6 +288,33 @@ app.get("/api/transactions", (_req, res) => {
 app.get("/api/cards", (_req, res) => {
   const rows = db.prepare("SELECT * FROM cards ORDER BY id").all();
   res.json(rows.map(mapCard));
+});
+
+app.post("/api/cards", (req, res) => {
+  const { customerId, type, limit, status = "Active" } = req.body;
+  if (!customerId || !type || limit === undefined || limit === null) {
+    return res.status(400).json({ error: "customerId, type and limit are required" });
+  }
+
+  const normalizedCustomerId = String(customerId).trim().toUpperCase();
+  const customer = db.prepare("SELECT id FROM customers WHERE id = ?").get(normalizedCustomerId);
+  if (!customer) {
+    return res.status(404).json({ error: "Customer not found" });
+  }
+
+  const numericLimit = Number(limit);
+  if (Number.isNaN(numericLimit) || numericLimit <= 0) {
+    return res.status(400).json({ error: "limit must be a valid positive number" });
+  }
+
+  const id = nextPrefixedId("CARD", "cards");
+  const maskedNumber = randomMaskedCardNumber();
+  db.prepare(
+    "INSERT INTO cards (id, customer_id, number_masked, type, status, card_limit) VALUES (?, ?, ?, ?, ?, ?)"
+  ).run(id, normalizedCustomerId, maskedNumber, type, status, numericLimit);
+
+  const row = db.prepare("SELECT * FROM cards WHERE id = ?").get(id);
+  res.status(201).json(mapCard(row));
 });
 
 app.get("/api/fraud-detections", (_req, res) => {
